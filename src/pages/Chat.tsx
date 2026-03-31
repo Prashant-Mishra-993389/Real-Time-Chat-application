@@ -3,7 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { encryptMessage, decryptMessage } from '../utils/crypto';
 import { getPrivateKey } from '../utils/db';
-import { Search, Send, LogOut, User as UserIcon } from 'lucide-react';
+import { Search, Send, LogOut, User as UserIcon, Shield, MessageSquare, Check, CheckCheck } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface User {
   _id: string;
@@ -49,7 +50,6 @@ export const Chat: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
-    // Fetch recent users
     const fetchRecent = async () => {
       try {
         const res = await fetch('/api/users/recent', {
@@ -100,19 +100,11 @@ export const Chat: React.FC = () => {
         if (res.ok) {
           const data: Message[] = await res.json();
           
-          // Decrypt messages
           const decryptedMessages = await Promise.all(
             data.map(async (msg) => {
               if (msg.senderId === user?.id) {
-                // Sent by me, I can't decrypt it unless I stored my own copy encrypted with my key.
-                // In a real app, we'd encrypt a copy for the sender too, or store it locally.
-                // For this assignment, we'll just show a placeholder or if we stored it locally, we'd show it.
-                // Wait, if I sent it, I encrypted it with THEIR public key. I can't decrypt it with MY private key.
-                // Let's modify the send logic to store the plaintext locally or encrypt a copy for ourselves.
-                // For now, let's just mark it as "[Sent Message]" if we can't decrypt it.
                 return { ...msg, decryptedMessage: '[Sent Message - E2EE]' };
               } else {
-                // Sent to me, decrypt with my private key
                 const decrypted = await decryptMessage(msg.encryptedMessage, privateKey);
                 return { ...msg, decryptedMessage: decrypted };
               }
@@ -173,17 +165,15 @@ export const Chat: React.FC = () => {
     setNewMessage('');
 
     try {
-      // Encrypt with receiver's public key
       const encrypted = await encryptMessage(messageText, selectedUser.publicKey);
       const tempId = Date.now().toString();
 
-      // Optimistically add to UI
       const optimisticMsg: Message = {
         _id: tempId,
         senderId: user!.id,
         receiverId: selectedUser._id,
         encryptedMessage: encrypted,
-        decryptedMessage: messageText, // We know what we sent
+        decryptedMessage: messageText,
         createdAt: new Date().toISOString(),
         status: 'sending',
         tempId,
@@ -204,24 +194,38 @@ export const Chat: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="flex h-screen items-center justify-center">Loading keys...</div>;
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#0a0a0a]">
+        <motion.div 
+          animate={{ rotate: 360 }}
+          transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+          className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full"
+        />
+      </div>
+    );
   }
 
   if (!privateKey) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center bg-gray-50 p-4">
-        <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
-          <h2 className="text-2xl font-bold text-red-600 mb-4">Private Key Missing</h2>
-          <p className="text-gray-600 mb-6">
+      <div className="flex h-screen flex-col items-center justify-center relative overflow-hidden">
+        <div className="atmospheric-bg"></div>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="glass-panel p-8 rounded-3xl shadow-2xl max-w-md w-full text-center z-10 mx-4"
+        >
+          <Shield className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold font-display text-white mb-4">Private Key Missing</h2>
+          <p className="text-zinc-400 mb-8">
             Your end-to-end encryption private key was not found on this device. You cannot read encrypted messages.
           </p>
           <button 
             onClick={logout}
-            className="w-full bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700"
+            className="w-full bg-indigo-600 text-white py-3 px-4 rounded-xl hover:bg-indigo-500 transition-colors font-medium"
           >
             Logout and create a new account
           </button>
-        </div>
+        </motion.div>
       </div>
     );
   }
@@ -229,134 +233,182 @@ export const Chat: React.FC = () => {
   const displayUsers = searchQuery ? searchResults : recentUsers;
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-[#0a0a0a] text-white overflow-hidden">
       {/* Sidebar */}
-      <div className="w-1/3 max-w-sm bg-white border-r flex flex-col">
-        <div className="p-4 border-b flex justify-between items-center bg-indigo-600 text-white">
-          <div className="font-bold text-lg truncate flex items-center gap-2">
-            <UserIcon size={20} />
-            {user?.username}
+      <div className="w-80 flex-shrink-0 border-r border-white/10 flex flex-col bg-[#0f0f0f] z-20">
+        <div className="p-5 border-b border-white/10 flex justify-between items-center">
+          <div className="font-display font-bold text-xl flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30 text-indigo-400">
+              <UserIcon size={20} />
+            </div>
+            <span className="truncate max-w-[140px]">{user?.username}</span>
           </div>
-          <button onClick={logout} className="p-2 hover:bg-indigo-700 rounded-full" title="Logout">
-            <LogOut size={20} />
+          <button 
+            onClick={logout} 
+            className="p-2.5 hover:bg-white/5 rounded-xl transition-colors text-zinc-400 hover:text-white" 
+            title="Logout"
+          >
+            <LogOut size={18} />
           </button>
         </div>
         
-        <div className="p-4 border-b">
+        <div className="p-4">
           <div className="relative">
             <input
               type="text"
               placeholder="Search users..."
-              className="w-full pl-10 pr-4 py-2 border rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full pl-11 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm transition-all placeholder:text-zinc-500"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <Search className="absolute left-3 top-2.5 text-gray-400" size={20} />
+            <Search className="absolute left-4 top-3 text-zinc-500" size={18} />
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
           {displayUsers.length === 0 ? (
-            <div className="p-4 text-center text-gray-500">
-              {searchQuery ? 'No users found' : 'Search for users to start chatting'}
+            <div className="p-8 text-center text-zinc-500 flex flex-col items-center gap-3">
+              <Search size={32} className="opacity-20" />
+              <p className="text-sm">{searchQuery ? 'No users found' : 'Search for users to start chatting'}</p>
             </div>
           ) : (
-            displayUsers.map((u) => (
-              <div
-                key={u._id}
-                onClick={() => setSelectedUser(u)}
-                className={`p-4 border-b cursor-pointer hover:bg-gray-50 flex items-center gap-3 ${
-                  selectedUser?._id === u._id ? 'bg-indigo-50 border-l-4 border-indigo-500' : ''
-                }`}
-              >
-                <div className="relative">
-                  <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">
-                    {u.username.charAt(0).toUpperCase()}
+            <div className="px-2 space-y-1">
+              {displayUsers.map((u) => (
+                <motion.div
+                  whileHover={{ scale: 0.98 }}
+                  whileTap={{ scale: 0.95 }}
+                  key={u._id}
+                  onClick={() => setSelectedUser(u)}
+                  className={`p-3 rounded-xl cursor-pointer flex items-center gap-3 transition-colors ${
+                    selectedUser?._id === u._id 
+                      ? 'bg-indigo-600/20 border border-indigo-500/30' 
+                      : 'hover:bg-white/5 border border-transparent'
+                  }`}
+                >
+                  <div className="relative">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center font-display font-bold text-lg ${
+                      selectedUser?._id === u._id ? 'bg-indigo-500 text-white' : 'bg-zinc-800 text-zinc-300'
+                    }`}>
+                      {u.username.charAt(0).toUpperCase()}
+                    </div>
+                    {onlineUsers.has(u._id) && (
+                      <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-[#0f0f0f]"></div>
+                    )}
                   </div>
-                  {onlineUsers.has(u._id) && (
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{u.username}</p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {onlineUsers.has(u._id) ? 'Online' : 'Offline'}
-                  </p>
-                </div>
-              </div>
-            ))
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium truncate ${selectedUser?._id === u._id ? 'text-indigo-300' : 'text-zinc-200'}`}>
+                      {u.username}
+                    </p>
+                    <p className="text-xs text-zinc-500 truncate mt-0.5">
+                      {onlineUsers.has(u._id) ? 'Online' : 'Offline'}
+                    </p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
           )}
         </div>
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col bg-gray-50">
+      <div className="flex-1 flex flex-col relative">
+        <div className="atmospheric-bg opacity-50"></div>
+        
         {selectedUser ? (
           <>
-            <div className="p-4 bg-white border-b flex items-center gap-3 shadow-sm z-10">
-              <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">
+            {/* Chat Header */}
+            <div className="px-6 py-4 glass-panel border-b-0 border-white/5 flex items-center gap-4 z-10">
+              <div className="w-12 h-12 bg-indigo-500/20 rounded-full flex items-center justify-center text-indigo-400 font-display font-bold text-lg border border-indigo-500/30">
                 {selectedUser.username.charAt(0).toUpperCase()}
               </div>
               <div>
-                <h2 className="text-lg font-bold text-gray-800">{selectedUser.username}</h2>
-                <p className="text-xs text-gray-500 flex items-center gap-1">
-                  <span className="text-green-600">â</span> End-to-End Encrypted
-                </p>
+                <h2 className="text-lg font-display font-bold text-white">{selectedUser.username}</h2>
+                <div className="flex items-center gap-1.5 text-xs text-indigo-400/80 mt-0.5">
+                  <Shield size={12} />
+                  <span>End-to-End Encrypted</span>
+                </div>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.map((msg, idx) => {
-                const isMe = msg.senderId === user?.id;
-                return (
-                  <div key={msg._id || idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                    <div
-                      className={`max-w-[70%] rounded-2xl px-4 py-2 shadow-sm ${
-                        isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white text-gray-800 rounded-bl-none border'
-                      }`}
+            {/* Messages Area */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar z-10">
+              <AnimatePresence initial={false}>
+                {messages.map((msg, idx) => {
+                  const isMe = msg.senderId === user?.id;
+                  return (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ duration: 0.2 }}
+                      key={msg._id || idx} 
+                      className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
                     >
-                      <p className="break-words">{msg.decryptedMessage}</p>
-                      <div className={`text-[10px] mt-1 text-right ${isMe ? 'text-indigo-200' : 'text-gray-400'}`}>
-                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        {isMe && (
-                          <span className="ml-1">
-                            {msg.status === 'sending' ? 'â±' : msg.status === 'sent' ? 'â' : 'ââ'}
-                          </span>
-                        )}
+                      <div
+                        className={`max-w-[75%] px-5 py-3 shadow-lg relative group ${
+                          isMe 
+                            ? 'bg-indigo-600 text-white rounded-2xl rounded-br-sm' 
+                            : 'glass-panel text-zinc-100 rounded-2xl rounded-bl-sm'
+                        }`}
+                      >
+                        <p className="break-words leading-relaxed text-[15px]">{msg.decryptedMessage}</p>
+                        <div className={`text-[10px] mt-2 flex items-center justify-end gap-1 ${isMe ? 'text-indigo-200' : 'text-zinc-500'}`}>
+                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {isMe && (
+                            <span>
+                              {msg.status === 'sending' ? (
+                                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-3 h-3 border border-indigo-200 border-t-transparent rounded-full" />
+                              ) : msg.status === 'sent' ? (
+                                <Check size={14} />
+                              ) : (
+                                <CheckCheck size={14} />
+                              )}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="p-4 bg-white border-t">
-              <form onSubmit={sendMessage} className="flex gap-2">
+            {/* Input Area */}
+            <div className="p-4 z-10">
+              <form onSubmit={sendMessage} className="flex gap-3 max-w-4xl mx-auto">
                 <input
                   type="text"
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   placeholder="Type an encrypted message..."
-                  className="flex-1 px-4 py-2 border rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50"
+                  className="flex-1 px-6 py-4 glass-panel rounded-full focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-zinc-500 text-white"
                 />
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   type="submit"
                   disabled={!newMessage.trim()}
-                  className="p-2 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="w-14 h-14 flex items-center justify-center bg-indigo-600 text-white rounded-full hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-[0_0_15px_rgba(99,102,241,0.4)]"
                 >
                   <Send size={20} className="ml-1" />
-                </button>
+                </motion.button>
               </form>
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center flex-col text-gray-400">
-            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-              <Search size={40} className="text-gray-300" />
-            </div>
-            <h2 className="text-xl font-medium text-gray-600">Select a chat to start messaging</h2>
-            <p className="text-sm mt-2">All messages are end-to-end encrypted.</p>
+          <div className="flex-1 flex items-center justify-center flex-col text-zinc-500 z-10">
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.5 }}
+              className="w-32 h-32 bg-white/5 rounded-full flex items-center justify-center mb-6 border border-white/10"
+            >
+              <MessageSquare size={48} className="text-zinc-600" />
+            </motion.div>
+            <h2 className="text-2xl font-display font-medium text-zinc-300 mb-2">Your Secure Space</h2>
+            <p className="text-sm text-zinc-500 max-w-sm text-center">
+              Select a user from the sidebar to start an end-to-end encrypted conversation.
+            </p>
           </div>
         )}
       </div>

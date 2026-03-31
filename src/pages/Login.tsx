@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getPrivateKey } from '../utils/db';
+import { motion } from 'motion/react';
+import { Lock, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -29,13 +31,9 @@ export const Login: React.FC = () => {
         throw new Error(data.error || 'Login failed');
       }
 
-      // Check if we have the private key for this user
       const privateKey = await getPrivateKey(data.user.id);
       if (!privateKey) {
-        // In a real app, we might prompt for a recovery key or password to decrypt a server-stored key
         console.warn('Private key not found on this device. You will not be able to decrypt old messages.');
-        // For this assignment, we'll just show a warning, but let them login.
-        // They won't be able to decrypt messages unless they import their key.
       }
 
       login(data.user, data.token);
@@ -48,31 +46,65 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to your account
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+      <div className="atmospheric-bg"></div>
+      
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        className="w-full max-w-md p-8 glass-panel rounded-3xl shadow-2xl relative z-10 mx-4"
+      >
+        <div className="text-center mb-10">
+          <motion.div 
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, type: "spring", stiffness: 200, damping: 20 }}
+            className="w-16 h-16 bg-indigo-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-indigo-500/30 glow-primary"
+          >
+            <ShieldCheck className="text-indigo-400" size={32} />
+          </motion.div>
+          <h2 className="text-3xl font-bold font-display tracking-tight text-white mb-2">
+            Welcome back
           </h2>
+          <p className="text-zinc-400 text-sm">
+            Sign in to access your secure, end-to-end encrypted chats.
+          </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && <div className="text-red-500 text-sm text-center">{error}</div>}
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
+
+        <form className="space-y-5" onSubmit={handleSubmit}>
+          {error && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center"
+            >
+              {error}
+            </motion.div>
+          )}
+          
+          <div className="space-y-4">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <Mail className="h-5 w-5 text-zinc-500" />
+              </div>
               <input
                 type="email"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="glass-input block w-full pl-11 pr-4 py-3 rounded-xl sm:text-sm"
                 placeholder="Email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
-            <div>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <Lock className="h-5 w-5 text-zinc-500" />
+              </div>
               <input
                 type="password"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="glass-input block w-full pl-11 pr-4 py-3 rounded-xl sm:text-sm"
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -80,22 +112,25 @@ export const Login: React.FC = () => {
             </div>
           </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-            >
-              {loading ? 'Signing in...' : 'Sign in'}
-            </button>
-          </div>
-          <div className="text-sm text-center">
-            <Link to="/signup" className="font-medium text-indigo-600 hover:text-indigo-500">
-              Don't have an account? Sign up
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            type="submit"
+            disabled={loading}
+            className="group relative w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent text-sm font-semibold rounded-xl text-white bg-indigo-600 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 focus:ring-offset-[#0a0a0a] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-[0_0_15px_rgba(99,102,241,0.5)] hover:shadow-[0_0_25px_rgba(99,102,241,0.6)]"
+          >
+            {loading ? 'Authenticating...' : 'Sign in'}
+            {!loading && <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />}
+          </motion.button>
+          
+          <div className="text-sm text-center mt-6">
+            <span className="text-zinc-500">Don't have an account? </span>
+            <Link to="/signup" className="font-medium text-indigo-400 hover:text-indigo-300 transition-colors">
+              Create one
             </Link>
           </div>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 };
